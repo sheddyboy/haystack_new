@@ -1,13 +1,18 @@
 import { XanoClient } from "@xano/js-sdk";
-import { debounce, qs } from "../utils";
+import { debounce, qs } from "../../utils";
 
-document.addEventListener("DOMContentLoaded", async () => {
+export async function searchCode({
+  dataSource,
+}: {
+  dataSource: "live" | "dev";
+}) {
+  const route = dataSource === "dev" ? "/dev" : "";
   const xano_global_search = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:G4uo48hy",
-  });
+  }).setDataSource(dataSource);
   const xano_wmx = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:6Ie7e140",
-  });
+  }).setDataSource(dataSource);
 
   const memberStackUserToken = localStorage.getItem("_ms-mid");
   const lsXanoAuthToken = localStorage.getItem("AuthToken");
@@ -103,7 +108,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const about = companyItem.querySelector(`[dev-target=about]`);
         const smallDesc = companyItem.querySelector(`[dev-target=small-desc]`);
 
-        companyItem!.href = "/company/" + company.slug;
+        companyItem!.href = `${route}/company/` + company.slug;
         name!.textContent = company.name;
         about!.textContent = removeHTMLTags(company.about);
         smallDesc!.textContent = company["description-small"];
@@ -166,7 +171,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           `[dev-target=description]`
         );
 
-        insightItem!.href = "/insight/" + insight.slug;
+        insightItem!.href = `${route}/insight/` + insight.slug;
         name!.textContent = insight.name;
         insightDetails!.textContent = removeHTMLTags(insight["insight-detail"]);
         description!.textContent = insight.description;
@@ -249,7 +254,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const title = personItem.querySelector(`[dev-target=title]`);
         const bio = personItem.querySelector(`[dev-target=bio]`);
 
-        personItem!.href = "/person/" + person.slug;
+        personItem!.href = `${route}/person/` + person.slug;
         name!.textContent = person.name;
         title!.textContent = person.title;
         bio!.textContent = person.bio;
@@ -297,7 +302,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const venue = eventItem.querySelector(`[dev-target=venue]`);
         const description = eventItem.querySelector(`[dev-target=description]`);
 
-        eventItem!.href = "/event/" + event.slug;
+        eventItem!.href = `${route}/event/` + event.slug;
         name!.textContent = event.name;
         city!.textContent = event["event-city-state"];
         venue!.textContent = event["event-venue-name"];
@@ -378,7 +383,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // function qs<T extends HTMLElement = HTMLDivElement>(selector: string): T {
   //   return document.querySelector(selector) as T;
   // }
-});
+}
 
 interface Company {
   id: number;

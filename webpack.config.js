@@ -163,6 +163,7 @@ module.exports = {
   },
   optimization: {
     splitChunks: false, // Disable code splitting
+    // minimize: false,
   },
   mode: "production", // or 'development' based on your needs
 };

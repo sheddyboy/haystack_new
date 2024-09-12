@@ -1,23 +1,30 @@
 import { XanoClient } from "@xano/js-sdk";
 import {
+  Company,
   FilterResponse,
   InsightPayload,
   PersonInsightResponse,
   SearchObject,
   UserFollowingAndFavourite,
-} from "../types";
-import { debounce, qs, qsa } from "../utils";
+} from "../../types";
+import { debounce, qs, qsa } from "../../utils";
 
-document.addEventListener("DOMContentLoaded", async () => {
+export async function companyPageCode({
+  dataSource,
+}: {
+  dataSource: "live" | "dev";
+}) {
+  const route = dataSource === "dev" ? "/dev" : "";
+
   const xano_individual_pages = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:CvEH0ZFk",
-  });
+  }).setDataSource(dataSource);
   const xano_wmx = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:6Ie7e140",
-  });
+  }).setDataSource(dataSource);
   const xano_userFeed = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:Hv8ldLVU",
-  });
+  }).setDataSource(dataSource);
 
   const searchObject: SearchObject = {
     search: "",
@@ -35,15 +42,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const searchParams = new URLSearchParams(window.location.search);
-  const eventSlug = searchParams.get("name");
+  const companySlug = searchParams.get("name");
 
   let userFollowingAndFavourite: UserFollowingAndFavourite | null = null;
   let xanoToken: string | null = null;
 
-  const eventCards = qsa("[dev-target=event-card]");
-  const cardSkeletons = qsa("[dev-target=card-skeleton]");
+  const relatedBusinessCards = qsa("[dev-target=related-business-card]");
+  const companyCards = qsa("[dev-target=company-card]");
+  const cardSkeleton = qsa("[dev-target=card-skeleton]");
   const insightsSkeleton = qs("[dev-target=skeleton-insights]");
-  const eventDetails = qsa("[dev-event-details]");
+  const companyDetails = qsa("[dev-target=company-details]");
+  const keyDocumentsCards = qsa(`[dev-target="key-documents-card"]`);
 
   const insightSearchInput = qs<HTMLInputElement>("[dev-search-target]");
   const insightFilterForm = qs<HTMLFormElement>("[dev-target=filter-form]");
@@ -53,6 +62,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const insightTemplate = qs(`[dev-template="insight-item"]`);
   const insightTagTemplate = qs(`[dev-template="insight-tag"]`);
   const checkboxItemTemplate = qs(`[dev-template="checkbox-item"]`);
+  const relatedBusinessItemTemplate = qs(
+    `[dev-template="related-business-item"]`
+  );
 
   const allTabsTarget = qs(`[dev-target="insight-all"]`);
 
@@ -80,10 +92,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     userFollowingAndFavourite = JSON.parse(lsUserFollowingFavourite);
   }
 
-  if (!eventSlug) {
-    return console.error(
-      "add event name in the url eg /event/58th-annual-edison-electric-institute-financial-conference"
-    );
+  if (!companySlug) {
+    return console.error("add company name in the url eg /company/oracle");
   }
 
   if (xanoToken) {
@@ -96,7 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   lsUserFollowingFavourite
     ? getUserFollowingAndFavourite()
     : await getUserFollowingAndFavourite();
-  eventPageInit(eventSlug);
+  companyPageInit(companySlug);
 
   async function getXanoAccessToken(memberstackToken: string) {
     try {
@@ -117,7 +127,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const res = await xano_userFeed.get("/user-following-and-favourite");
       const followingAndFavourite = res.getBody() as UserFollowingAndFavourite;
-      // const { user_following } = followingAndFavourite;
       userFollowingAndFavourite = followingAndFavourite;
       localStorage.setItem(
         "user-following-favourite",
@@ -131,16 +140,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function eventPageInit(eventSlug: string) {
-    getEventInsights(eventSlug, {});
-    getEvent(eventSlug);
+  async function companyPageInit(companySlug: string) {
+    getCompanyInsights(companySlug, {});
+    getCompany(companySlug);
     insightFilterForm.addEventListener("submit", (e) => {
       e.preventDefault();
       e.stopPropagation();
     });
     insightSearchInput.addEventListener("input", () => {
       searchObject.search = insightSearchInput.value;
-      searchDebounce(eventSlug);
+      searchDebounce(companySlug);
     });
     insightClearFilters.addEventListener("click", () => {
       const checkedFilters = qsa<HTMLInputElement>(
@@ -158,43 +167,43 @@ document.addEventListener("DOMContentLoaded", async () => {
       {},
       "companyType",
       filterCompanyTypeTarget,
-      eventSlug
+      companySlug
     );
     getFilters(
       "/source_category",
       {},
       "sourceCat",
       filterSourceCatTarget,
-      eventSlug
+      companySlug
     );
     getFilters(
       "/technology_category",
       {},
       "techCat",
       filterTechCatTarget,
-      eventSlug
+      companySlug
     );
     // getFilters(
     //   "/line_of_business",
     //   {},
     //   "lineOfBus",
     //   filterLineOfBusTarget,
-    //   eventSlug
+    //   companySlug
     // );
     getFilters(
       "/insight_classification",
       {},
       "insightClass",
       filterInsightClassTarget,
-      eventSlug
+      companySlug
     );
-    sortLogicInit(eventSlug);
+    sortLogicInit(companySlug);
   }
 
-  async function getEventInsights(slug: string, payload: InsightPayload) {
+  async function getCompanyInsights(slug: string, payload: InsightPayload) {
     const { page = 0, perPage = 0, offset = 0 } = payload;
     try {
-      const res = await xano_individual_pages.get("/event_insights", {
+      const res = await xano_individual_pages.get("/company_insights", {
         slug,
         page,
         perPage,
@@ -203,187 +212,275 @@ document.addEventListener("DOMContentLoaded", async () => {
         orderBy: sortObject.orderBy,
         filtering: searchObject,
       });
-      const eventInsightResponse = res.getBody() as PersonInsightResponse;
+      const personInsightResponse = res.getBody() as PersonInsightResponse;
       allTabsTarget.innerHTML = "";
 
-      paginationLogic(eventInsightResponse, slug);
+      paginationLogic(personInsightResponse, slug);
 
       userFollowingAndFavourite &&
         initInsights(
-          eventInsightResponse,
+          personInsightResponse,
           allTabsTarget,
           userFollowingAndFavourite
         );
       insightsSkeleton.remove();
-      console.log("eventInsightResponse", eventInsightResponse);
-      return eventInsightResponse;
+      console.log("personInsightResponse", personInsightResponse);
+      return personInsightResponse;
     } catch (error) {
-      console.log("getEventInsights_error", error);
+      console.log("getCompanyInsights_error", error);
       return null;
     }
   }
 
-  function paginationLogic(insight: PersonInsightResponse, eventSlug: string) {
-    const paginationTarget = qs(`[dev-target="all-tab-pagination_wrapper"]`);
+  const searchDebounce = debounce(insightSearch, 500);
 
-    const { curPage, nextPage, prevPage, itemsReceived } = insight;
-    const paginationWrapper = paginationTarget.closest(
-      `[dev-target="insight-pagination-wrapper"]`
-    );
-    const pagination = paginationTemplate.cloneNode(true) as HTMLDivElement;
-    const prevBtn = pagination.querySelector(
-      `[dev-target=pagination-previous]`
-    ) as HTMLButtonElement;
-    const nextBtn = pagination.querySelector(
-      `[dev-target=pagination-next]`
-    ) as HTMLButtonElement;
-    const pageItemWrapper = pagination.querySelector(
-      `[dev-target=pagination-number-wrapper]`
-    ) as HTMLDivElement;
-    // const pageItem = pagination
-    //   .querySelector(`[dev-target=page-number-temp]`)
-    //   ?.cloneNode(true) as HTMLButtonElement;
+  function insightSearch(companySlug: string) {
+    getCompanyInsights(companySlug, {
+      orderBy: sortObject.orderBy,
+      sortBy: sortObject.sortBy,
+    });
+  }
 
-    paginationTarget.innerHTML = "";
-    pageItemWrapper.innerHTML = "";
-
-    if (itemsReceived === 0) {
-      paginationTarget?.classList.add("hide");
-      paginationWrapper
-        ?.querySelector(`[dev-tab-empty-state]`)
-        ?.classList.remove("hide");
-    } else {
-      paginationTarget?.classList.remove("hide");
-      paginationWrapper
-        ?.querySelector(`[dev-tab-empty-state]`)
-        ?.classList.add("hide");
-    }
-
-    // if (pageTotal <= 6) {
-    //   for (let i = 1; i <= pageTotal; i++) {
-    //     const pageNumItem = pageItem.cloneNode(true) as HTMLDivElement;
-    //     pageNumItem.textContent = i.toString();
-    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
-    //     pageNumItem.addEventListener("click", () => {
-    //       paginationWrapper?.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       window.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       getEventInsights(eventSlug, { page: i });
-    //       //   getInsights(endPoint, { page: i }, tagTarget);
-    //     });
-    //     pageItemWrapper.appendChild(pageNumItem);
-    //   }
-    // } else {
-    //   const firstPageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //   firstPageNumItem.textContent = "1";
-    //   firstPageNumItem.classList[curPage === 1 ? "add" : "remove"]("active");
-    //   firstPageNumItem.addEventListener("click", () => {
-    //     paginationWrapper?.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     window.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     getEventInsights(eventSlug, { page: 1 });
-    //     // getInsights(endPoint, { page: 1 }, tagTarget);
-    //   });
-    //   pageItemWrapper.appendChild(firstPageNumItem);
-
-    //   if (curPage > 3) {
-    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pagItemDots.textContent = "...";
-    //     pagItemDots.classList["add"]("not-allowed");
-    //     pageItemWrapper.appendChild(pagItemDots);
-    //   }
-
-    //   for (
-    //     let i = Math.max(2, curPage - 1);
-    //     i <= Math.min(curPage + 1, pageTotal - 1);
-    //     i++
-    //   ) {
-    //     const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
-    //     pageNumItem.textContent = i.toString();
-    //     pageNumItem.addEventListener("click", () => {
-    //       paginationWrapper?.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       window.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       getEventInsights(eventSlug, { page: i });
-    //       //   getInsights(endPoint, { page: i }, tagTarget);
-    //     });
-    //     pageItemWrapper.appendChild(pageNumItem);
-    //   }
-
-    //   if (curPage < pageTotal - 2) {
-    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pagItemDots.textContent = "...";
-    //     pagItemDots.classList["add"]("not-allowed");
-    //     pageItemWrapper.appendChild(pagItemDots);
-    //   }
-
-    //   const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //   pageNumItem.textContent = pageTotal.toString();
-    //   pageNumItem.classList[curPage === pageTotal ? "add" : "remove"]("active");
-    //   pageNumItem.addEventListener("click", () => {
-    //     paginationWrapper?.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     window.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     getEventInsights(eventSlug, { page: 1 });
-    //   });
-    //   pageItemWrapper.appendChild(pageNumItem);
-    // }
-
-    prevBtn.classList[prevPage ? "remove" : "add"]("disabled");
-    nextBtn.classList[nextPage ? "remove" : "add"]("disabled");
-
-    nextPage &&
-      nextBtn.addEventListener("click", () => {
-        paginationWrapper?.scrollTo({
-          top: 0,
-          behavior: "smooth",
+  function sortLogicInit(companySlug: string) {
+    const sortItems = qsa<HTMLLinkElement>(`[dev-target="sort"]`);
+    sortItems.forEach((item) => {
+      item.addEventListener("click", () => {
+        sortItems.forEach((sortItem) => {
+          sortItem.classList.remove("active");
         });
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        getEventInsights(eventSlug, { page: curPage + 1 });
+        item.classList.add("active");
+        const value = item.textContent;
+        qs(`[dev-target=sorted-item-name]`).textContent = value;
+        const orderBy = item.getAttribute("dev-orderby");
+        const sortBy = item.getAttribute("dev-sortby");
+
+        if (sortBy && orderBy) {
+          sortObject.sortBy = sortBy;
+          sortObject.orderBy = orderBy;
+        }
+
+        getCompanyInsights(companySlug, {});
       });
-    prevPage &&
-      prevBtn.addEventListener("click", () => {
-        paginationWrapper?.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        getEventInsights(eventSlug, { page: curPage - 1 });
-        // getInsights(endPoint, { page: curPage - 1 }, tagTarget);
-      });
-    // pagination.style.display = pageTotal === 1 ? "none" : "flex";
+    });
+  }
 
-    if (nextPage === null && prevPage === null) {
-      paginationTarget?.classList.add("hide");
+  async function getCompany(slug: string) {
+    try {
+      const res = await xano_individual_pages.get("/company", {
+        slug,
+      });
+      const company = res.getBody() as Company;
+      if (company === null) {
+        window.location.href = "/404";
+        return null;
+      }
+      qs("title").textContent = company.name;
+      console.log("company", company);
+      const aboutRichText = qs(`[dev-target="about-rich-text"]`);
+      aboutRichText!.innerHTML = company.about;
+
+      companyCards.forEach((companyCard) => {
+        const location = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="location-wrapper"]`
+        );
+        const companySize = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="company-size-wrapper"]`
+        );
+        const businessEntity = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="business-entity-wrapper"]`
+        );
+        const companyType = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="company-type-wrapper"]`
+        );
+        const companyRevenue = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="company-revenue-wrapper"]`
+        );
+        const fiscalYear = companyCard.querySelector<HTMLDivElement>(
+          `[dev-target="fiscal-year-wrapper"]`
+        );
+
+        if (company.location) {
+          location!.querySelector("p")!.textContent = company.location;
+        } else {
+          location?.classList.add("hide");
+        }
+        if (company["company-size"]) {
+          companySize!.querySelector("p")!.textContent =
+            company["company-size"];
+        } else {
+          companySize?.classList.add("hide");
+        }
+        if (company["company-revenue"]) {
+          companyRevenue!.querySelector("p")!.textContent =
+            company["company-revenue"];
+        } else {
+          companyRevenue?.classList.add("hide");
+        }
+        if (company["fiscal-year"]) {
+          fiscalYear!.querySelector("p")!.textContent = company["fiscal-year"];
+        } else {
+          fiscalYear?.classList.add("hide");
+        }
+        if (company.business_entity_details) {
+          businessEntity!.querySelector("p")!.textContent =
+            company.business_entity_details.name;
+        } else {
+          businessEntity?.classList.add("hide");
+        }
+        if (company.company_type_details) {
+          companyType!.querySelector("p")!.textContent =
+            company.company_type_details.name;
+        } else {
+          companyType?.classList.add("hide");
+        }
+
+        const companyName = companyCard.querySelector<HTMLHeadingElement>(
+          `[dev-target=company-name]`
+        );
+        const companyLink = companyCard.querySelector<HTMLLinkElement>(
+          `[dev-target=company-website]`
+        );
+        const companyLinkedinLink = companyCard.querySelector<HTMLLinkElement>(
+          `[dev-target=linkedin-link]`
+        );
+        const companyImageWrapper = companyCard.querySelector(
+          `[dev-target=company-image-wrapper]`
+        );
+        // const companyImageLink =
+        //   companyImageWrapper?.querySelector<HTMLLinkElement>(
+        //     `[dev-target=company-picture-link]`
+        //   );
+        const companyImage =
+          companyImageWrapper?.querySelector<HTMLImageElement>(
+            `[dev-target=company-image]`
+          );
+        const companyInput =
+          companyImageWrapper?.querySelector<HTMLInputElement>(
+            `[dev-target=company-input]`
+          );
+
+        companyLinkedinLink!.href = company["company-linkedin-profile-link"];
+        companyName!.textContent = company.name;
+        companyLink!.textContent = company["company-website"];
+        companyLink!.href = company["company-website"];
+        if (company.company_logo) {
+          companyImage!.src = company.company_logo.url;
+        } else {
+          companyImage!.src = `https://logo.clearbit.com/${company["company-website"]}`;
+          fetch(
+            "https://logo.clearbit.com/" + company["company-website"]
+          ).catch(
+            () =>
+              (companyImage!.src =
+                "https://uploads-ssl.webflow.com/64a2a18ba276228b93b991d7/64c7c26d6639a8e16ee7797f_Frame%20427318722.webp")
+          );
+        }
+        companyCard.classList.remove("dev-hide");
+
+        cardSkeleton.forEach((item) => item.remove());
+
+        fakeCheckboxToggle(companyInput!);
+        companyInput?.setAttribute("dev-input-type", "company_id");
+        companyInput?.setAttribute("dev-input-id", company.id.toString());
+        companyInput && followFavouriteLogic(companyInput);
+        companyInput &&
+          setCheckboxesInitialState(
+            companyInput,
+            convertArrayOfObjToNumber(
+              userFollowingAndFavourite!.user_following.company_id
+            )
+          );
+      });
+
+      keyDocumentsCards.forEach((keyDocumentsCard) => {
+        const keyDocumentsItemTemplate =
+          keyDocumentsCard.querySelector<HTMLDivElement>(
+            `[dev-target="key-documents-template"]`
+          ) as HTMLDivElement;
+        const keyDocumentsWrapper = keyDocumentsCard.querySelector(
+          `[dev-target="key-documents-wrapper"]`
+        );
+        if (
+          company.key_documents &&
+          company.key_documents.length > 0 &&
+          company.key_documents.some((item) => item !== null)
+        ) {
+          company.key_documents.forEach((keyDocument) => {
+            if (keyDocument === null) return;
+            const keyDocumentItem = keyDocumentsItemTemplate.cloneNode(
+              true
+            ) as HTMLDivElement;
+            const keyDocumentItemLink =
+              keyDocumentItem.querySelector<HTMLLinkElement>(
+                `[dev-target="key-documents-link"]`
+              );
+            keyDocumentItemLink!.textContent = keyDocument.name;
+            keyDocumentItemLink!.href = keyDocument.document
+              ? keyDocument.document.url
+              : keyDocument.document_url;
+
+            keyDocumentsWrapper?.appendChild(keyDocumentItem);
+          });
+          keyDocumentsCard
+            .querySelector(`[dev-target="empty-state"]`)
+            ?.classList.add("hide");
+        } else {
+          keyDocumentsCard
+            .querySelector(`[dev-target="empty-state"]`)
+            ?.classList.remove("hide");
+          keyDocumentsWrapper?.classList.add("hide");
+        }
+      });
+
+      relatedBusinessCards.forEach((relatedBusinessCard) => {
+        if (
+          (company["related-business-entities"] &&
+            company["related-business-entities"].length === 0) ||
+          company["related-business-entities"] === null
+        ) {
+          relatedBusinessCard
+            .querySelector(`[dev-target=related-business-empty-state]`)
+            ?.classList.remove("hide");
+        }
+
+        if (
+          company["related-business-entities"] &&
+          company["related-business-entities"].length > 0 &&
+          company["related-business-entities"][0] !== null
+        ) {
+          company["related-business-entities"].forEach((item) => {
+            if (item === null) return;
+            const relatedBusinessItem = relatedBusinessItemTemplate.cloneNode(
+              true
+            ) as HTMLDivElement;
+            const name = relatedBusinessItem.querySelector(`[dev-target=name]`);
+            const description = relatedBusinessItem.querySelector(
+              `[dev-target=description]`
+            );
+            const companyLink =
+              relatedBusinessItem.querySelector<HTMLLinkElement>(
+                `[dev-target=company-link]`
+              );
+
+            name!.textContent = item.name;
+            description!.textContent = item["description-small"];
+            companyLink!.href = `${route}/company/` + item.slug;
+
+            relatedBusinessCard
+              .querySelector(`[dev-target=related-business-wrapper]`)
+              ?.appendChild(relatedBusinessItem);
+            window.Webflow.require("ix2").init();
+          });
+        }
+      });
+
+      companyDetails.forEach((item) => item.classList.remove("opacity-hide"));
+
+      return company;
+    } catch (error) {
+      console.log("getCompany_error", error);
+      return null;
     }
-    paginationTarget.appendChild(pagination);
   }
 
   function initInsights(
@@ -449,10 +546,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       companyInputs.forEach((companyInput) => {
         fakeCheckboxToggle(companyInput!);
         companyInput?.setAttribute("dev-input-type", "company_id");
-        companyInput?.setAttribute(
-          "dev-input-id",
-          insight.company_id.toString()
-        );
+        if (insight.company_id) {
+          companyInput?.setAttribute(
+            "dev-input-id",
+            insight.company_id.toString()
+          );
+        } else {
+          const inputForm = companyInput.closest("form");
+          if (inputForm) {
+            inputForm.style.display = "none";
+          }
+        }
+        // insight.company_id &&
+        //   companyInput?.setAttribute(
+        //     "dev-input-id",
+        //     insight.company_id.toString()
+        //   );
         companyInput && followFavouriteLogic(companyInput);
         companyInput &&
           setCheckboxesInitialState(
@@ -515,14 +624,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       publishedDateTargetWrapper.forEach((item) =>
         item.classList[publishedDate ? "remove" : "add"]("hide")
       );
-      insightLink!.setAttribute("href", "/insight/" + insight.slug);
+      insightLink!.setAttribute("href", `${route}/insight/` + insight.slug);
       sourceTarget!.setAttribute("href", insight["source-url"]);
       sourceTargetWrapper?.classList[insight["source-url"] ? "remove" : "add"](
         "hide"
       );
       companyLink!.setAttribute(
         "href",
-        "/company/" + insight.company_details.slug
+        `${route}/company/` + insight.company_details.slug
       );
       sourceTarget!.textContent = insight.source;
       sourceAuthorTargetWrapper.forEach((item) =>
@@ -533,13 +642,172 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  const searchDebounce = debounce(insightSearch, 500);
+  function paginationLogic(
+    insight: PersonInsightResponse,
+    companySlug: string
+  ) {
+    const paginationTarget = qs(`[dev-target="all-tab-pagination_wrapper"]`);
 
-  function insightSearch(eventSlug: string) {
-    getEventInsights(eventSlug, {
-      orderBy: sortObject.orderBy,
-      sortBy: sortObject.sortBy,
-    });
+    const { curPage, nextPage, prevPage, itemsReceived } = insight;
+    const paginationWrapper = paginationTarget.closest(
+      `[dev-target="insight-pagination-wrapper"]`
+    );
+    const pagination = paginationTemplate.cloneNode(true) as HTMLDivElement;
+    const prevBtn = pagination.querySelector(
+      `[dev-target=pagination-previous]`
+    ) as HTMLButtonElement;
+    const nextBtn = pagination.querySelector(
+      `[dev-target=pagination-next]`
+    ) as HTMLButtonElement;
+    const pageItemWrapper = pagination.querySelector(
+      `[dev-target=pagination-number-wrapper]`
+    ) as HTMLDivElement;
+    // const pageItem = pagination
+    //   .querySelector(`[dev-target=page-number-temp]`)
+    //   ?.cloneNode(true) as HTMLButtonElement;
+
+    paginationTarget.innerHTML = "";
+    pageItemWrapper.innerHTML = "";
+
+    if (itemsReceived === 0) {
+      paginationTarget?.classList.add("hide");
+      paginationWrapper
+        ?.querySelector(`[dev-tab-empty-state]`)
+        ?.classList.remove("hide");
+    } else {
+      paginationTarget?.classList.remove("hide");
+      paginationWrapper
+        ?.querySelector(`[dev-tab-empty-state]`)
+        ?.classList.add("hide");
+    }
+
+    // if (pageTotal <= 6) {
+    //   for (let i = 1; i <= pageTotal; i++) {
+    //     const pageNumItem = pageItem.cloneNode(true) as HTMLDivElement;
+    //     pageNumItem.textContent = i.toString();
+    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
+    //     pageNumItem.addEventListener("click", () => {
+    //       paginationWrapper?.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       window.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       getCompanyInsights(companySlug, { page: i });
+    //       //   getInsights(endPoint, { page: i }, tagTarget);
+    //     });
+    //     pageItemWrapper.appendChild(pageNumItem);
+    //   }
+    // } else {
+    //   const firstPageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //   firstPageNumItem.textContent = "1";
+    //   firstPageNumItem.classList[curPage === 1 ? "add" : "remove"]("active");
+    //   firstPageNumItem.addEventListener("click", () => {
+    //     paginationWrapper?.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     window.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     getCompanyInsights(companySlug, { page: 1 });
+    //     // getInsights(endPoint, { page: 1 }, tagTarget);
+    //   });
+    //   pageItemWrapper.appendChild(firstPageNumItem);
+
+    //   if (curPage > 3) {
+    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pagItemDots.textContent = "...";
+    //     pagItemDots.classList["add"]("not-allowed");
+    //     pageItemWrapper.appendChild(pagItemDots);
+    //   }
+
+    //   for (
+    //     let i = Math.max(2, curPage - 1);
+    //     i <= Math.min(curPage + 1, pageTotal - 1);
+    //     i++
+    //   ) {
+    //     const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
+    //     pageNumItem.textContent = i.toString();
+    //     pageNumItem.addEventListener("click", () => {
+    //       paginationWrapper?.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       window.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       getCompanyInsights(companySlug, { page: i });
+    //       //   getInsights(endPoint, { page: i }, tagTarget);
+    //     });
+    //     pageItemWrapper.appendChild(pageNumItem);
+    //   }
+
+    //   if (curPage < pageTotal - 2) {
+    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pagItemDots.textContent = "...";
+    //     pagItemDots.classList["add"]("not-allowed");
+    //     pageItemWrapper.appendChild(pagItemDots);
+    //   }
+
+    //   const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //   pageNumItem.textContent = pageTotal.toString();
+    //   pageNumItem.classList[curPage === pageTotal ? "add" : "remove"]("active");
+    //   pageNumItem.addEventListener("click", () => {
+    //     paginationWrapper?.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     window.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     getCompanyInsights(companySlug, { page: 1 });
+    //     // getInsights(endPoint, { page: pageTotal }, tagTarget);
+    //   });
+    //   pageItemWrapper.appendChild(pageNumItem);
+    // }
+
+    prevBtn.classList[prevPage ? "remove" : "add"]("disabled");
+    nextBtn.classList[nextPage ? "remove" : "add"]("disabled");
+
+    nextPage &&
+      nextBtn.addEventListener("click", () => {
+        paginationWrapper?.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        getCompanyInsights(companySlug, { page: curPage + 1 });
+        // getInsights(endPoint, { page: curPage + 1 }, tagTarget);
+      });
+    prevPage &&
+      prevBtn.addEventListener("click", () => {
+        paginationWrapper?.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        getCompanyInsights(companySlug, { page: curPage - 1 });
+        // getInsights(endPoint, { page: curPage - 1 }, tagTarget);
+      });
+    // pagination.style.display = pageTotal === 1 ? "none" : "flex";
+
+    if (nextPage === null && prevPage === null) {
+      paginationTarget?.classList.add("hide");
+    }
+    paginationTarget.appendChild(pagination);
   }
 
   function followFavouriteLogic(input: HTMLInputElement) {
@@ -572,29 +840,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function sortLogicInit(eventSlug: string) {
-    const sortItems = qsa<HTMLLinkElement>(`[dev-target="sort"]`);
-    sortItems.forEach((item) => {
-      item.addEventListener("click", () => {
-        sortItems.forEach((sortItem) => {
-          sortItem.classList.remove("active");
-        });
-        item.classList.add("active");
-        const value = item.textContent;
-        qs(`[dev-target=sorted-item-name]`).textContent = value;
-        const orderBy = item.getAttribute("dev-orderby");
-        const sortBy = item.getAttribute("dev-sortby");
-
-        if (sortBy && orderBy) {
-          sortObject.sortBy = sortBy;
-          sortObject.orderBy = orderBy;
-        }
-
-        getEventInsights(eventSlug, {});
-      });
-    });
-  }
-
   async function getFilters(
     endPoint:
       | "/company_type"
@@ -610,7 +855,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       | "lineOfBus"
       | "insightClass",
     targetWrapper: HTMLDivElement,
-    eventSlug: string
+    companySlug: string
   ) {
     const { page = 0, perPage = 0, offset = 0 } = payload;
     try {
@@ -619,8 +864,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         perPage,
         offset,
         type: {
-          event: {
-            slug: eventSlug,
+          company: {
+            slug: companySlug,
             value: true,
           },
         },
@@ -641,7 +886,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               type
             ].filter((item) => item != filter.id);
           }
-          searchDebounce(eventSlug);
+          searchDebounce(companySlug);
         });
         newFilter.querySelector("[dev-target=name]")!.textContent = filter.name;
         targetWrapper.appendChild(newFilter);
@@ -680,6 +925,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       `[dev-input-type="technology_category_id"]`
     );
 
+    companyCards.forEach((companyCard) => {
+      const pageCompanyInput = companyCard.querySelector<HTMLInputElement>(
+        `[dev-input-type="company_id"]`
+      );
+      pageCompanyInput &&
+        setCheckboxesInitialState(
+          pageCompanyInput,
+          convertArrayOfObjToNumber(
+            userFollowingAndFavourite?.user_following.company_id!
+          )
+        );
+    });
+
     tagInputs?.forEach((tag) => {
       setCheckboxesInitialState(
         tag,
@@ -688,125 +946,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         )
       );
     });
-  }
-
-  async function getEvent(slug: string) {
-    try {
-      const res = await xano_individual_pages.get("/event", {
-        slug,
-      });
-      const event = res.getBody() as Event;
-      if (event === null) {
-        return (window.location.href = "/404");
-      }
-      qs("title").textContent = event.name;
-      console.log("event", event);
-
-      eventCards.forEach((eventCard) => {
-        const eventName = eventCard.querySelector<HTMLHeadingElement>(
-          `[dev-target=event-name]`
-        );
-        const eventDatesWrapper = eventCard.querySelector<HTMLHeadingElement>(
-          `[dev-target=dates-wrapper]`
-        );
-        const eventVenueWrapper = eventCard.querySelector<HTMLHeadingElement>(
-          `[dev-target=venue-wrapper]`
-        );
-        const eventCityWrapper = eventCard.querySelector<HTMLHeadingElement>(
-          `[dev-target=city-wrapper]`
-        );
-        const eventDesc = eventCard.querySelector(`[dev-target=richtext]`);
-
-        const eventImageWrapper = eventCard.querySelector(
-          `[dev-target=event-image-wrapper]`
-        );
-        // const eventImageLink =
-        //   eventImageWrapper?.querySelector<HTMLLinkElement>(
-        //     `[dev-target=event-picture-link]`
-        //   );
-        const eventImage = eventImageWrapper?.querySelector<HTMLImageElement>(
-          `[dev-target=event-image]`
-        );
-        const eventInput = eventImageWrapper?.querySelector<HTMLInputElement>(
-          `[dev-target=event-input]`
-        );
-
-        eventName!.textContent = event.name;
-        eventDesc!.innerHTML = event["event-description"];
-
-        if (event.image && event.image.url && eventImage) {
-          eventImage.src = event.image.url;
-        }
-
-        if (event["event-start-date"]) {
-          const eventStartDate = new Date(event["event-start-date"]);
-          const month = eventStartDate.toLocaleDateString("en-US", {
-            month: "short",
-          });
-          const day = eventStartDate.getUTCDate().toString();
-          eventDatesWrapper!.querySelector("[dev-start-month]")!.textContent =
-            month;
-          eventDatesWrapper!.querySelector("[dev-start-day]")!.textContent =
-            day;
-        } else {
-          eventVenueWrapper?.classList.add("hide");
-        }
-        if (event["event-end-date"]) {
-          const eventEndDate = new Date(event["event-end-date"]);
-          const month = eventEndDate.toLocaleDateString("en-US", {
-            month: "short",
-          });
-          const day = eventEndDate.getUTCDate().toString();
-          const year = eventEndDate.toLocaleDateString("en-US", {
-            year: "numeric",
-          });
-          eventDatesWrapper!.querySelector("[dev-end-month]")!.textContent =
-            month;
-          eventDatesWrapper!.querySelector("[dev-end-day]")!.textContent = day;
-          eventDatesWrapper!.querySelector("[dev-end-year]")!.textContent =
-            year;
-        } else {
-          // eventVenueWrapper?.classList.add("hide")
-        }
-        if (event["event-venue-name"]) {
-          eventVenueWrapper!.querySelector(
-            `[dev-target=venue-name]`
-          )!.textContent = event["event-venue-name"];
-        } else {
-          eventVenueWrapper?.classList.add("hide");
-        }
-        if (event["event-city-state"]) {
-          eventCityWrapper!.querySelector(
-            `[dev-target=city-name]`
-          )!.textContent = event["event-city-state"];
-        } else {
-          eventCityWrapper?.classList.add("hide");
-        }
-
-        cardSkeletons.forEach((cardSkeleton) => cardSkeleton.remove());
-        eventCard.classList.remove("dev-hide");
-
-        fakeCheckboxToggle(eventInput!);
-        eventInput?.setAttribute("dev-input-type", "event_id");
-        eventInput?.setAttribute("dev-input-id", event.id.toString());
-        eventInput && followFavouriteLogic(eventInput);
-        eventInput &&
-          setCheckboxesInitialState(
-            eventInput,
-            convertArrayOfObjToNumber(
-              userFollowingAndFavourite!.user_following.event_id
-            )
-          );
-      });
-      eventDetails.forEach((item) => {
-        item.classList.remove("opacity-hide");
-      });
-
-      return event;
-    } catch (error) {
-      console.log("getEvent_error", error);
-      return null;
-    }
   }
 
   function setCheckboxesInitialState(
@@ -872,7 +1011,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             `[dev-fake-checkbox-wrapper]`
           )!.style.cursor = "pointer";
           const anchor = document.createElement("a");
-          anchor.href = `/technology/${item.slug}`;
+          anchor.href = `${route}/technology/${item.slug}`;
           anchor.textContent = tagSpan!.textContent;
           anchor.style.cursor = "pointer";
           anchor.classList.add("tag-span-name");
@@ -900,7 +1039,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const date = new Date(inputDate);
     return `${date.toLocaleString("default", {
       month: "short",
-      timeZone: "UTC",
     })} ${date.getFullYear()}`;
   }
 
@@ -908,7 +1046,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const date = new Date(inputDate);
     return `${date.toLocaleString("default", {
       month: "long",
-      timeZone: "UTC",
     })} ${date.getUTCDate()}, ${date.getFullYear()}`;
   }
 
@@ -925,18 +1062,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   function convertArrayOfObjToNumber(data: { id: number }[]) {
     return data.map((item) => item.id);
   }
-});
-
-interface Event {
-  id: number;
-  created_at: string;
-  name: string;
-  slug: string;
-  "event-start-date": string;
-  "event-end-date": string;
-  "event-city-state": string;
-  "event-venue-name": string;
-  people_id: number[];
-  "event-description": string;
-  image: null | { url: string };
 }

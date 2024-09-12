@@ -2,21 +2,27 @@ import { XanoClient } from "@xano/js-sdk";
 import {
   FilterResponse,
   InsightPayload,
+  PersonInsightResponse,
   SearchObject,
   UserFollowingAndFavourite,
-} from "../types";
-import { debounce, qs, qsa } from "../utils";
+} from "../../types";
+import { debounce, qs, qsa } from "../../utils";
 
-document.addEventListener("DOMContentLoaded", async () => {
+export async function techPageCode({
+  dataSource,
+}: {
+  dataSource: "live" | "dev";
+}) {
+  const route = dataSource === "dev" ? "/dev" : "";
   const xano_individual_pages = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:CvEH0ZFk",
-  });
+  }).setDataSource(dataSource);
   const xano_wmx = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:6Ie7e140",
-  });
+  }).setDataSource(dataSource);
   const xano_userFeed = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:Hv8ldLVU",
-  });
+  }).setDataSource(dataSource);
 
   const searchObject: SearchObject = {
     search: "",
@@ -34,15 +40,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const searchParams = new URLSearchParams(window.location.search);
-  const personSlug = searchParams.get("name");
+  const technologySlug = searchParams.get("name");
 
   let userFollowingAndFavourite: UserFollowingAndFavourite | null = null;
   let xanoToken: string | null = null;
 
-  const personCards = qsa("[dev-target=person-card]");
+  const techCatCards = qsa("[dev-target=tech-cat-card]");
   const cardSkeletons = qsa("[dev-target=card-skeleton]");
   const insightsSkeleton = qs("[dev-target=skeleton-insights]");
-  const personDetails = qsa("[dev-target=person-details]");
+  const eventDetails = qsa("[dev-event-details]");
 
   const insightSearchInput = qs<HTMLInputElement>("[dev-search-target]");
   const insightFilterForm = qs<HTMLFormElement>("[dev-target=filter-form]");
@@ -79,8 +85,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     userFollowingAndFavourite = JSON.parse(lsUserFollowingFavourite);
   }
 
-  if (!personSlug) {
-    return console.error("add person name in the url eg /person/andre-gouin");
+  if (!technologySlug) {
+    return console.error("add event name in the url eg /technology/analytics");
   }
 
   if (xanoToken) {
@@ -93,7 +99,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   lsUserFollowingFavourite
     ? getUserFollowingAndFavourite()
     : await getUserFollowingAndFavourite();
-  peoplePageInit(personSlug);
+  technologyCatPageInit(technologySlug);
 
   async function getXanoAccessToken(memberstackToken: string) {
     try {
@@ -128,16 +134,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function peoplePageInit(personSlug: string) {
-    getPersonInsights(personSlug, {});
-    getPerson(personSlug);
+  async function technologyCatPageInit(technologySlug: string) {
+    getTechnologyCatInsights(technologySlug, {});
+    getTechnologyCat(technologySlug);
     insightFilterForm.addEventListener("submit", (e) => {
       e.preventDefault();
       e.stopPropagation();
     });
     insightSearchInput.addEventListener("input", () => {
       searchObject.search = insightSearchInput.value;
-      searchDebounce(personSlug);
+      searchDebounce(technologySlug);
     });
     insightClearFilters.addEventListener("click", () => {
       const checkedFilters = qsa<HTMLInputElement>(
@@ -155,209 +161,241 @@ document.addEventListener("DOMContentLoaded", async () => {
       {},
       "companyType",
       filterCompanyTypeTarget,
-      personSlug
+      technologySlug
     );
     getFilters(
       "/source_category",
       {},
       "sourceCat",
       filterSourceCatTarget,
-      personSlug
+      technologySlug
     );
     getFilters(
       "/technology_category",
       {},
       "techCat",
       filterTechCatTarget,
-      personSlug
+      technologySlug
     );
     // getFilters(
     //   "/line_of_business",
     //   {},
     //   "lineOfBus",
     //   filterLineOfBusTarget,
-    //   personSlug
+    //   technologySlug
     // );
     getFilters(
       "/insight_classification",
       {},
       "insightClass",
       filterInsightClassTarget,
-      personSlug
+      technologySlug
     );
-    sortLogicInit(personSlug);
+    sortLogicInit(technologySlug);
   }
 
-  async function getPerson(slug: string) {
-    try {
-      const res = await xano_individual_pages.get("/person", {
-        slug,
-      });
-      const person = res.getBody() as Person;
-      if (person === null) {
-        return (window.location.href = "/404");
-      }
-      qs("title").textContent = person.name;
-      console.log("person", person);
-
-      personCards.forEach((personCard) => {
-        const personName = personCard.querySelector<HTMLHeadingElement>(
-          `[dev-target=person-name]`
-        );
-        const personEmail = personCard.querySelector<HTMLLinkElement>(
-          `[dev-target=email-link]`
-        );
-        const personTitle = personCard.querySelector<HTMLParagraphElement>(
-          `[dev-target=person-title]`
-        );
-        const personBio = personCard.querySelector<HTMLParagraphElement>(
-          `[dev-target=person-bio]`
-        );
-        const personCompanyLink = personCard.querySelector<HTMLLinkElement>(
-          `[dev-target=person-company-link]`
-        );
-        const personLinkedinLink = personCard.querySelector<HTMLLinkElement>(
-          `[dev-target=linkedin-link]`
-        );
-        const personImageWrapper = personCard.querySelector(
-          `[dev-target=person-image-wrapper]`
-        );
-        // const personImageLink =
-        //   personImageWrapper?.querySelector<HTMLLinkElement>(
-        //     `[dev-target=person-picture-link]`
-        //   );
-        // const PersonImage = personImageWrapper?.querySelector(
-        //   `[dev-target=person-image]`
-        // );
-        const personInput = personImageWrapper?.querySelector<HTMLInputElement>(
-          `[dev-target=person-input]`
-        );
-
-        personName!.textContent = person.name;
-        personTitle!.textContent = person.title;
-        personBio!.textContent = person.bio;
-        personCompanyLink!.textContent = person.company_details.name;
-        personCompanyLink!.href = "company/" + person.company_details.slug;
-        personLinkedinLink!.href = person.linkedin;
-        personLinkedinLink?.classList[person.linkedin ? "remove" : "add"](
-          "hide"
-        );
-        personEmail!.href = person.email ? "mailto:" + person.email : "#";
-        personEmail?.classList[person.email ? "remove" : "add"]("hide");
-
-        cardSkeletons.forEach((cardSkeleton) => cardSkeleton.remove());
-        personCard.classList.remove("dev-hide");
-
-        fakeCheckboxToggle(personInput!);
-        personInput?.setAttribute("dev-input-type", "people_id");
-        personInput?.setAttribute("dev-input-id", person.id.toString());
-        personInput && followFavouriteLogic(personInput);
-        personInput &&
-          setCheckboxesInitialState(
-            personInput,
-            convertArrayOfObjToNumber(
-              userFollowingAndFavourite!.user_following.people_id
-            )
-          );
-      });
-      personDetails.forEach((personDetail) =>
-        personDetail.classList.remove("opacity-hide")
-      );
-      return person;
-    } catch (error) {
-      console.log("getPerson_error", error);
-      return null;
-    }
-  }
-
-  async function getPersonInsights(slug: string, payload: InsightPayload) {
+  async function getTechnologyCatInsights(
+    slug: string,
+    payload: InsightPayload
+  ) {
     const { page = 0, perPage = 0, offset = 0 } = payload;
     try {
-      const res = await xano_individual_pages.get("/person_insights", {
-        slug,
-        page,
-        perPage,
-        offset,
-        sortBy: sortObject.sortBy,
-        orderBy: sortObject.orderBy,
-        filtering: searchObject,
-      });
-      const personInsightResponse = res.getBody() as PersonInsightResponse;
+      const res = await xano_individual_pages.get(
+        "/technology_category_insights",
+        {
+          slug,
+          page,
+          perPage,
+          offset,
+          sortBy: sortObject.sortBy,
+          orderBy: sortObject.orderBy,
+          filtering: searchObject,
+        }
+      );
+      const eventInsightResponse = res.getBody() as PersonInsightResponse;
       allTabsTarget.innerHTML = "";
 
-      paginationLogic(personInsightResponse, slug);
+      paginationLogic(eventInsightResponse, slug);
 
       userFollowingAndFavourite &&
         initInsights(
-          personInsightResponse,
+          eventInsightResponse,
           allTabsTarget,
           userFollowingAndFavourite
         );
       insightsSkeleton.remove();
-      console.log("personInsightResponse", personInsightResponse);
-      return personInsightResponse;
+      console.log("eventInsightResponse", eventInsightResponse);
+      return eventInsightResponse;
     } catch (error) {
-      console.log("getPersonInsights_error", error);
+      console.log("getTechnologyCatInsights_error", error);
       return null;
     }
   }
 
-  async function getFilters(
-    endPoint:
-      | "/company_type"
-      | "/insight_classification"
-      | "/line_of_business"
-      | "/source_category"
-      | "/technology_category",
-    payload: { page?: number; perPage?: number; offset?: number },
-    type:
-      | "companyType"
-      | "sourceCat"
-      | "techCat"
-      | "lineOfBus"
-      | "insightClass",
-    targetWrapper: HTMLDivElement,
-    personSlug: string
+  function paginationLogic(
+    insight: PersonInsightResponse,
+    technologySlug: string
   ) {
-    const { page = 0, perPage = 0, offset = 0 } = payload;
-    try {
-      const res = await xano_individual_pages.get(endPoint, {
-        page,
-        perPage,
-        offset,
-        type: {
-          people: {
-            slug: personSlug,
-            value: true,
-          },
-        },
-      });
-      const filters = res.getBody() as FilterResponse[];
-      filters.forEach((filter) => {
-        const newFilter = checkboxItemTemplate.cloneNode(
-          true
-        ) as HTMLDivElement;
-        const input =
-          newFilter.querySelector<HTMLInputElement>("[dev-target=input]");
-        input && fakeCheckboxToggle(input);
-        input?.addEventListener("change", () => {
-          if (input.checked) {
-            searchObject.checkboxes[type].push(filter.id);
-          } else {
-            searchObject.checkboxes[type] = searchObject.checkboxes[
-              type
-            ].filter((item) => item != filter.id);
-          }
-          searchDebounce(personSlug);
-        });
-        newFilter.querySelector("[dev-target=name]")!.textContent = filter.name;
-        targetWrapper.appendChild(newFilter);
-      });
-      return filters;
-    } catch (error) {
-      console.error(`getFilters_${endPoint}_error`, error);
-      return null;
+    const paginationTarget = qs(`[dev-target="all-tab-pagination_wrapper"]`);
+
+    const { curPage, nextPage, prevPage, itemsReceived } = insight;
+    const paginationWrapper = paginationTarget.closest(
+      `[dev-target="insight-pagination-wrapper"]`
+    );
+    const pagination = paginationTemplate.cloneNode(true) as HTMLDivElement;
+    const prevBtn = pagination.querySelector(
+      `[dev-target=pagination-previous]`
+    ) as HTMLButtonElement;
+    const nextBtn = pagination.querySelector(
+      `[dev-target=pagination-next]`
+    ) as HTMLButtonElement;
+    const pageItemWrapper = pagination.querySelector(
+      `[dev-target=pagination-number-wrapper]`
+    ) as HTMLDivElement;
+    // const pageItem = pagination
+    //   .querySelector(`[dev-target=page-number-temp]`)
+    //   ?.cloneNode(true) as HTMLButtonElement;
+
+    paginationTarget.innerHTML = "";
+    pageItemWrapper.innerHTML = "";
+
+    if (itemsReceived === 0) {
+      paginationTarget?.classList.add("hide");
+      paginationWrapper
+        ?.querySelector(`[dev-tab-empty-state]`)
+        ?.classList.remove("hide");
+    } else {
+      paginationTarget?.classList.remove("hide");
+      paginationWrapper
+        ?.querySelector(`[dev-tab-empty-state]`)
+        ?.classList.add("hide");
     }
+
+    // if (pageTotal <= 6) {
+    //   for (let i = 1; i <= pageTotal; i++) {
+    //     const pageNumItem = pageItem.cloneNode(true) as HTMLDivElement;
+    //     pageNumItem.textContent = i.toString();
+    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
+    //     pageNumItem.addEventListener("click", () => {
+    //       paginationWrapper?.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       window.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       getTechnologyCatInsights(technologySlug, { page: i });
+    //       //   getInsights(endPoint, { page: i }, tagTarget);
+    //     });
+    //     pageItemWrapper.appendChild(pageNumItem);
+    //   }
+    // } else {
+    //   const firstPageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //   firstPageNumItem.textContent = "1";
+    //   firstPageNumItem.classList[curPage === 1 ? "add" : "remove"]("active");
+    //   firstPageNumItem.addEventListener("click", () => {
+    //     paginationWrapper?.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     window.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     getTechnologyCatInsights(technologySlug, { page: 1 });
+    //     // getInsights(endPoint, { page: 1 }, tagTarget);
+    //   });
+    //   pageItemWrapper.appendChild(firstPageNumItem);
+
+    //   if (curPage > 3) {
+    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pagItemDots.textContent = "...";
+    //     pagItemDots.classList["add"]("not-allowed");
+    //     pageItemWrapper.appendChild(pagItemDots);
+    //   }
+
+    //   for (
+    //     let i = Math.max(2, curPage - 1);
+    //     i <= Math.min(curPage + 1, pageTotal - 1);
+    //     i++
+    //   ) {
+    //     const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
+    //     pageNumItem.textContent = i.toString();
+    //     pageNumItem.addEventListener("click", () => {
+    //       paginationWrapper?.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       window.scrollTo({
+    //         top: 0,
+    //         behavior: "smooth",
+    //       });
+    //       getTechnologyCatInsights(technologySlug, { page: i });
+    //       //   getInsights(endPoint, { page: i }, tagTarget);
+    //     });
+    //     pageItemWrapper.appendChild(pageNumItem);
+    //   }
+
+    //   if (curPage < pageTotal - 2) {
+    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
+    //     pagItemDots.textContent = "...";
+    //     pagItemDots.classList["add"]("not-allowed");
+    //     pageItemWrapper.appendChild(pagItemDots);
+    //   }
+
+    //   const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
+    //   pageNumItem.textContent = pageTotal.toString();
+    //   pageNumItem.classList[curPage === pageTotal ? "add" : "remove"]("active");
+    //   pageNumItem.addEventListener("click", () => {
+    //     paginationWrapper?.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     window.scrollTo({
+    //       top: 0,
+    //       behavior: "smooth",
+    //     });
+    //     getTechnologyCatInsights(technologySlug, { page: 1 });
+    //   });
+    //   pageItemWrapper.appendChild(pageNumItem);
+    // }
+
+    prevBtn.classList[prevPage ? "remove" : "add"]("disabled");
+    nextBtn.classList[nextPage ? "remove" : "add"]("disabled");
+
+    nextPage &&
+      nextBtn.addEventListener("click", () => {
+        paginationWrapper?.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        getTechnologyCatInsights(technologySlug, { page: curPage + 1 });
+      });
+    prevPage &&
+      prevBtn.addEventListener("click", () => {
+        paginationWrapper?.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+        getTechnologyCatInsights(technologySlug, { page: curPage - 1 });
+        // getInsights(endPoint, { page: curPage - 1 }, tagTarget);
+      });
+    // pagination.style.display = pageTotal === 1 ? "none" : "flex";
+
+    if (nextPage === null && prevPage === null) {
+      paginationTarget?.classList.add("hide");
+    }
+    paginationTarget.appendChild(pagination);
   }
 
   function initInsights(
@@ -423,10 +461,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       companyInputs.forEach((companyInput) => {
         fakeCheckboxToggle(companyInput!);
         companyInput?.setAttribute("dev-input-type", "company_id");
-        companyInput?.setAttribute(
-          "dev-input-id",
-          insight.company_id.toString()
-        );
+        if (insight.company_id) {
+          companyInput?.setAttribute(
+            "dev-input-id",
+            insight.company_id.toString()
+          );
+        } else {
+          const inputForm = companyInput.closest("form");
+          if (inputForm) {
+            inputForm.style.display = "none";
+          }
+        }
+        // companyInput?.setAttribute(
+        //   "dev-input-id",
+        //   insight.company_id.toString()
+        // );
         companyInput && followFavouriteLogic(companyInput);
         companyInput &&
           setCheckboxesInitialState(
@@ -489,14 +538,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       publishedDateTargetWrapper.forEach((item) =>
         item.classList[publishedDate ? "remove" : "add"]("hide")
       );
-      insightLink!.setAttribute("href", "/insight/" + insight.slug);
+      insightLink!.setAttribute("href", `${route}/insight/` + insight.slug);
       sourceTarget!.setAttribute("href", insight["source-url"]);
       sourceTargetWrapper?.classList[insight["source-url"] ? "remove" : "add"](
         "hide"
       );
       companyLink!.setAttribute(
         "href",
-        "/company/" + insight.company_details.slug
+        `${route}/company/` + insight.company_details.slug
       );
       sourceTarget!.textContent = insight.source;
       sourceAuthorTargetWrapper.forEach((item) =>
@@ -509,37 +558,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const searchDebounce = debounce(insightSearch, 500);
 
-  function insightSearch(personSlug: string) {
-    getPersonInsights(personSlug, {
+  function insightSearch(technologySlug: string) {
+    getTechnologyCatInsights(technologySlug, {
       orderBy: sortObject.orderBy,
       sortBy: sortObject.sortBy,
-    });
-  }
-
-  function sortLogicInit(personSlug: string) {
-    const sortItems = qsa<HTMLLinkElement>(`[dev-target="sort"]`);
-    sortItems.forEach((item) => {
-      item.addEventListener("click", () => {
-        sortItems.forEach((sortItem) => {
-          sortItem.classList.remove("active");
-        });
-        item.classList.add("active");
-        const value = item.textContent;
-        qs(`[dev-target=sorted-item-name]`).textContent = value;
-        const orderBy = item.getAttribute("dev-orderby");
-        const sortBy = item.getAttribute("dev-sortby");
-
-        if (sortBy && orderBy) {
-          sortObject.sortBy = sortBy;
-          sortObject.orderBy = orderBy;
-        }
-
-        getPersonInsights(personSlug, {});
-
-        // getInsights("/insight-all-tab", {}, allTabsTarget);
-        // getInsights("/insight-following-tab", {}, followingTabsTarget);
-        // getInsights("/insight-favourite-tab", {}, favouriteTabsTarget);
-      });
     });
   }
 
@@ -573,6 +595,87 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function sortLogicInit(technologySlug: string) {
+    const sortItems = qsa<HTMLLinkElement>(`[dev-target="sort"]`);
+    sortItems.forEach((item) => {
+      item.addEventListener("click", () => {
+        sortItems.forEach((sortItem) => {
+          sortItem.classList.remove("active");
+        });
+        item.classList.add("active");
+        const value = item.textContent;
+        qs(`[dev-target=sorted-item-name]`).textContent = value;
+        const orderBy = item.getAttribute("dev-orderby");
+        const sortBy = item.getAttribute("dev-sortby");
+
+        if (sortBy && orderBy) {
+          sortObject.sortBy = sortBy;
+          sortObject.orderBy = orderBy;
+        }
+
+        getTechnologyCatInsights(technologySlug, {});
+      });
+    });
+  }
+
+  async function getFilters(
+    endPoint:
+      | "/company_type"
+      | "/insight_classification"
+      | "/line_of_business"
+      | "/source_category"
+      | "/technology_category",
+    payload: { page?: number; perPage?: number; offset?: number },
+    type:
+      | "companyType"
+      | "sourceCat"
+      | "techCat"
+      | "lineOfBus"
+      | "insightClass",
+    targetWrapper: HTMLDivElement,
+    technologySlug: string
+  ) {
+    const { page = 0, perPage = 0, offset = 0 } = payload;
+    try {
+      const res = await xano_individual_pages.get(endPoint, {
+        page,
+        perPage,
+        offset,
+        type: {
+          technology: {
+            slug: technologySlug,
+            value: true,
+          },
+        },
+      });
+      const filters = res.getBody() as FilterResponse[];
+      filters.forEach((filter) => {
+        const newFilter = checkboxItemTemplate.cloneNode(
+          true
+        ) as HTMLDivElement;
+        const input =
+          newFilter.querySelector<HTMLInputElement>("[dev-target=input]");
+        input && fakeCheckboxToggle(input);
+        input?.addEventListener("change", () => {
+          if (input.checked) {
+            searchObject.checkboxes[type].push(filter.id);
+          } else {
+            searchObject.checkboxes[type] = searchObject.checkboxes[
+              type
+            ].filter((item) => item != filter.id);
+          }
+          searchDebounce(technologySlug);
+        });
+        newFilter.querySelector("[dev-target=name]")!.textContent = filter.name;
+        targetWrapper.appendChild(newFilter);
+      });
+      return filters;
+    } catch (error) {
+      console.error(`getFilters_${endPoint}_error`, error);
+      return null;
+    }
+  }
+
   function updateInsightsInputs(insight: HTMLDivElement) {
     const companyInputs = insight.querySelectorAll<HTMLInputElement>(
       `[dev-input-type="company_id"]`
@@ -600,6 +703,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       `[dev-input-type="technology_category_id"]`
     );
 
+    techCatCards.forEach((techCatCard) => {
+      const pageTechCatInput = techCatCard.querySelector<HTMLInputElement>(
+        `[dev-input-type="technology_category_id"]`
+      );
+      pageTechCatInput &&
+        setCheckboxesInitialState(
+          pageTechCatInput,
+          convertArrayOfObjToNumber(
+            userFollowingAndFavourite?.user_following.technology_category_id!
+          )
+        );
+    });
+
     tagInputs?.forEach((tag) => {
       setCheckboxesInitialState(
         tag,
@@ -608,6 +724,66 @@ document.addEventListener("DOMContentLoaded", async () => {
         )
       );
     });
+  }
+
+  async function getTechnologyCat(slug: string) {
+    try {
+      const res = await xano_individual_pages.get("/technology_category_item", {
+        slug,
+      });
+      const event = res.getBody() as Event;
+      if (event === null) {
+        window.location.href = "/404";
+        return null;
+      }
+      qs("title").textContent = event.name;
+      console.log("event", event);
+
+      techCatCards.forEach((techCatCard) => {
+        const techCatName = techCatCard.querySelector<HTMLHeadingElement>(
+          `[dev-target=event-name]`
+        );
+
+        const eventImageWrapper = techCatCard.querySelector(
+          `[dev-target=event-image-wrapper]`
+        );
+        // const eventImageLink =
+        //   eventImageWrapper?.querySelector<HTMLLinkElement>(
+        //     `[dev-target=event-picture-link]`
+        //   );
+        // const eventImage = eventImageWrapper?.querySelector(
+        //   `[dev-target=event-image]`
+        // );
+        const eventInput = eventImageWrapper?.querySelector<HTMLInputElement>(
+          `[dev-target=event-input]`
+        );
+
+        techCatName!.textContent = event.name;
+
+        cardSkeletons.forEach((cardSkeleton) => cardSkeleton.remove());
+        techCatCard.classList.remove("dev-hide");
+
+        fakeCheckboxToggle(eventInput!);
+        eventInput?.setAttribute("dev-input-type", "technology_category_id");
+        eventInput?.setAttribute("dev-input-id", event.id.toString());
+        eventInput && followFavouriteLogic(eventInput);
+        eventInput &&
+          setCheckboxesInitialState(
+            eventInput,
+            convertArrayOfObjToNumber(
+              userFollowingAndFavourite!.user_following.technology_category_id
+            )
+          );
+      });
+      eventDetails.forEach((item) => {
+        item.classList.remove("opacity-hide");
+      });
+
+      return event;
+    } catch (error) {
+      console.log("getTechnologyCat_error", error);
+      return null;
+    }
   }
 
   function setCheckboxesInitialState(
@@ -673,7 +849,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             `[dev-fake-checkbox-wrapper]`
           )!.style.cursor = "pointer";
           const anchor = document.createElement("a");
-          anchor.href = `/technology/${item.slug}`;
+          anchor.href = `${route}/technology/${item.slug}`;
           anchor.textContent = tagSpan!.textContent;
           anchor.style.cursor = "pointer";
           anchor.classList.add("tag-span-name");
@@ -695,171 +871,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         targetWrapper?.appendChild(newTag);
       }
     });
-  }
-
-  function paginationLogic(insight: PersonInsightResponse, personSlug: string) {
-    const paginationTarget = qs(`[dev-target="all-tab-pagination_wrapper"]`);
-
-    const { curPage, nextPage, prevPage, itemsReceived } = insight;
-    const paginationWrapper = paginationTarget.closest(
-      `[dev-target="insight-pagination-wrapper"]`
-    );
-    const pagination = paginationTemplate.cloneNode(true) as HTMLDivElement;
-    const prevBtn = pagination.querySelector(
-      `[dev-target=pagination-previous]`
-    ) as HTMLButtonElement;
-    const nextBtn = pagination.querySelector(
-      `[dev-target=pagination-next]`
-    ) as HTMLButtonElement;
-    const pageItemWrapper = pagination.querySelector(
-      `[dev-target=pagination-number-wrapper]`
-    ) as HTMLDivElement;
-    // const pageItem = pagination
-    //   .querySelector(`[dev-target=page-number-temp]`)
-    //   ?.cloneNode(true) as HTMLButtonElement;
-
-    paginationTarget.innerHTML = "";
-    pageItemWrapper.innerHTML = "";
-
-    if (itemsReceived === 0) {
-      paginationTarget?.classList.add("hide");
-      paginationWrapper
-        ?.querySelector(`[dev-tab-empty-state]`)
-        ?.classList.remove("hide");
-    } else {
-      paginationTarget?.classList.remove("hide");
-      paginationWrapper
-        ?.querySelector(`[dev-tab-empty-state]`)
-        ?.classList.add("hide");
-    }
-
-    // if (pageTotal <= 6) {
-    //   for (let i = 1; i <= pageTotal; i++) {
-    //     const pageNumItem = pageItem.cloneNode(true) as HTMLDivElement;
-    //     pageNumItem.textContent = i.toString();
-    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
-    //     pageNumItem.addEventListener("click", () => {
-    //       paginationWrapper?.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       window.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       getPersonInsights(personSlug, { page: i });
-    //       //   getInsights(endPoint, { page: i }, tagTarget);
-    //     });
-    //     pageItemWrapper.appendChild(pageNumItem);
-    //   }
-    // } else {
-    //   const firstPageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //   firstPageNumItem.textContent = "1";
-    //   firstPageNumItem.classList[curPage === 1 ? "add" : "remove"]("active");
-    //   firstPageNumItem.addEventListener("click", () => {
-    //     paginationWrapper?.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     window.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     getPersonInsights(personSlug, { page: 1 });
-    //     // getInsights(endPoint, { page: 1 }, tagTarget);
-    //   });
-    //   pageItemWrapper.appendChild(firstPageNumItem);
-
-    //   if (curPage > 3) {
-    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pagItemDots.textContent = "...";
-    //     pagItemDots.classList["add"]("not-allowed");
-    //     pageItemWrapper.appendChild(pagItemDots);
-    //   }
-
-    //   for (
-    //     let i = Math.max(2, curPage - 1);
-    //     i <= Math.min(curPage + 1, pageTotal - 1);
-    //     i++
-    //   ) {
-    //     const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pageNumItem.classList[curPage === i ? "add" : "remove"]("active");
-    //     pageNumItem.textContent = i.toString();
-    //     pageNumItem.addEventListener("click", () => {
-    //       paginationWrapper?.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       window.scrollTo({
-    //         top: 0,
-    //         behavior: "smooth",
-    //       });
-    //       getPersonInsights(personSlug, { page: i });
-    //       //   getInsights(endPoint, { page: i }, tagTarget);
-    //     });
-    //     pageItemWrapper.appendChild(pageNumItem);
-    //   }
-
-    //   if (curPage < pageTotal - 2) {
-    //     const pagItemDots = pageItem.cloneNode(true) as HTMLButtonElement;
-    //     pagItemDots.textContent = "...";
-    //     pagItemDots.classList["add"]("not-allowed");
-    //     pageItemWrapper.appendChild(pagItemDots);
-    //   }
-
-    //   const pageNumItem = pageItem.cloneNode(true) as HTMLButtonElement;
-    //   pageNumItem.textContent = pageTotal.toString();
-    //   pageNumItem.classList[curPage === pageTotal ? "add" : "remove"]("active");
-    //   pageNumItem.addEventListener("click", () => {
-    //     paginationWrapper?.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     window.scrollTo({
-    //       top: 0,
-    //       behavior: "smooth",
-    //     });
-    //     getPersonInsights(personSlug, { page: 1 });
-    //     // getInsights(endPoint, { page: pageTotal }, tagTarget);
-    //   });
-    //   pageItemWrapper.appendChild(pageNumItem);
-    // }
-
-    prevBtn.classList[prevPage ? "remove" : "add"]("disabled");
-    nextBtn.classList[nextPage ? "remove" : "add"]("disabled");
-
-    nextPage &&
-      nextBtn.addEventListener("click", () => {
-        paginationWrapper?.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        getPersonInsights(personSlug, { page: curPage + 1 });
-        // getInsights(endPoint, { page: curPage + 1 }, tagTarget);
-      });
-    prevPage &&
-      prevBtn.addEventListener("click", () => {
-        paginationWrapper?.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-        getPersonInsights(personSlug, { page: curPage - 1 });
-        // getInsights(endPoint, { page: curPage - 1 }, tagTarget);
-      });
-    // pagination.style.display = pageTotal === 1 ? "none" : "flex";
-
-    if (nextPage === null && prevPage === null) {
-      paginationTarget?.classList.add("hide");
-    }
-    paginationTarget.appendChild(pagination);
   }
 
   function formatCuratedDate(inputDate: Date) {
@@ -891,73 +902,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   function convertArrayOfObjToNumber(data: { id: number }[]) {
     return data.map((item) => item.id);
   }
-});
-
-interface Person {
-  id: number;
-  name: string;
-  slug: string;
-  title: string;
-  bio: string;
-  company_id: number;
-  email: string;
-  linkedin: string;
-  picture: null;
-  company_details: {
-    id: number;
-    name: string;
-    slug: string;
-  };
 }
 
-interface PersonInsightResponse {
-  itemsReceived: number;
-  curPage: number;
-  nextPage: null;
-  prevPage: null;
-  offset: number;
-  itemsTotal: number;
-  pageTotal: number;
-  items: {
-    id: number;
-    created_at: number;
-    name: string;
-    slug: string;
-    company_id: number;
-    description: string;
-    "insight-detail": string;
-    curated: Date;
-    source_author: string;
-    source: string;
-    "source-url": string;
-    "source-publication-date": Date;
-    source_category_id: any[];
-    company_type_id: {
-      id: number;
-      name: string;
-      slug: string;
-    }[];
-    insight_classification_id: {
-      id: number;
-      name: string;
-      slug: string;
-    }[];
-    line_of_business_id: any[];
-    technology_category_id: {
-      id: number;
-      name: string;
-      slug: string;
-    }[];
-    "companies-mentioned": any[];
-    people_id: number[];
-    event_id: number;
-    published: boolean;
-    company_details: {
-      id: number;
-      name: string;
-      slug: string;
-      "company-website": string;
-      company_logo: null | { url: string };
-    };
-  }[];
+interface Event {
+  id: number;
+  created_at: string;
+  name: string;
+  slug: string;
+  "event-start-date": string;
+  "event-end-date": string;
+  "event-city-state": string;
+  "event-venue-name": string;
+  people_id: number[];
+  "event-description": string;
+  image: { url: string } | null;
 }

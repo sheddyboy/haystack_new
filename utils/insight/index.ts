@@ -1,18 +1,22 @@
 import { XanoClient } from "@xano/js-sdk";
-import { InsightResponse, UserFollowingAndFavourite } from "../types";
-import { debounce, qs, qsa } from "../utils";
-
-document.addEventListener("DOMContentLoaded", async () => {
+import { InsightResponse, UserFollowingAndFavourite } from "../../types";
+import { debounce, qs, qsa } from "../../utils";
+export async function insightPageCode({
+  dataSource,
+}: {
+  dataSource: "live" | "dev";
+}) {
+  const route = dataSource === "dev" ? "/dev" : "";
   console.log("insight-dev");
   const xano_individual_pages = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:CvEH0ZFk",
-  });
+  }).setDataSource(dataSource);
   const xano_wmx = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:6Ie7e140",
-  });
+  }).setDataSource(dataSource);
   const xano_userFeed = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:Hv8ldLVU",
-  });
+  }).setDataSource(dataSource);
   const insightTagTemplate = qs(`[dev-template="insight-tag"]`);
 
   let userFollowingAndFavourite: UserFollowingAndFavourite | null = null;
@@ -143,10 +147,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       companyInputs.forEach((companyInput) => {
         fakeCheckboxToggle(companyInput!);
         companyInput?.setAttribute("dev-input-type", "company_id");
-        companyInput?.setAttribute(
-          "dev-input-id",
-          insight.company_id.toString()
-        );
+        if (insight.company_id) {
+          companyInput?.setAttribute(
+            "dev-input-id",
+            insight.company_id.toString()
+          );
+        } else {
+          const inputForm = companyInput.closest("form");
+          if (inputForm) {
+            inputForm.style.display = "none";
+          }
+        }
+        // companyInput?.setAttribute(
+        //   "dev-input-id",
+        //   insight.company_id.toString()
+        // );
         companyInput && followFavouriteLogic(companyInput);
         companyInput &&
           setCheckboxesInitialState(
@@ -205,8 +220,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       sourceAuthorTarget!.textContent = insight.source_author;
       insightName!.textContent = insight.name;
       companyLink!.textContent = insight.company_details.name;
-      companyLink!.href = "/company/" + insight.company_details.slug;
-      companyPictureLink!.href = "/company/" + insight.company_details.slug;
+      companyLink!.href = `${route}/company/` + insight.company_details.slug;
+      companyPictureLink!.href =
+        `${route}/company/` + insight.company_details.slug;
       insightRichtext!.innerHTML = insight["insight-detail"];
       addTagsToInsight(insight.company_type_id, tagsWrapperTarget!, false);
       addTagsToInsight(insight.source_category_id, tagsWrapperTarget!, false);
@@ -262,8 +278,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     "https://uploads-ssl.webflow.com/64a2a18ba276228b93b991d7/64c7c26d6639a8e16ee7797f_Frame%20427318722.webp")
               );
             }
-            companyPictureLink!.href = "/company/" + item.slug;
-            companyLink!.href = "/company/" + item.slug;
+            companyPictureLink!.href = `${route}/company/` + item.slug;
+            companyLink!.href = `${route}/company/` + item.slug;
             companyLink!.textContent = item.name;
             fakeCheckboxToggle(companyInput!);
             companyInput?.setAttribute("dev-input-type", "company_id");
@@ -347,9 +363,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             const personName = `${person.name}${
               personTitleName && ", " + truncateText(personTitleName, 30)
             }`;
-            const personLink = "/person/" + person.slug;
+            const personLink = `${route}/person/` + person.slug;
             const companyName = person._company?.name;
-            const companyLink = "/company/" + person._company?.slug;
+            const companyLink = `${route}/company/` + person._company?.slug;
 
             personItemLink!.textContent = personName;
             personItemLink!.href = personLink;
@@ -384,7 +400,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             true
           ) as HTMLLinkElement;
           eventItem.textContent = insight.event_details.name;
-          eventItem.href = "/event/" + insight.event_details.slug;
+          eventItem.href = `${route}/event/` + insight.event_details.slug;
 
           eventWrapper?.append(eventItem);
           eventCards.forEach((eventCard) =>
@@ -497,7 +513,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             `[dev-fake-checkbox-wrapper]`
           )!.style.cursor = "pointer";
           const anchor = document.createElement("a");
-          anchor.href = `/technology/${item.slug}`;
+          anchor.href = `${route}/technology/${item.slug}`;
           anchor.textContent = tagSpan!.textContent;
           anchor.style.cursor = "pointer";
           anchor.classList.add("tag-span-name");
@@ -637,4 +653,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ): NodeListOf<T> {
   //   return document.querySelectorAll(selector) as NodeListOf<T>;
   // }
-});
+}

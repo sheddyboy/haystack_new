@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack",
-    "dev": "vite",
+    "dev": "webpack --watch",
     "start": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -4,19 +4,15 @@ import {
   type InsightPayload,
   type SearchObject,
   type UserFollowingAndFavourite,
-} from "../types/index";
+} from "../../types/index";
 import { XanoClient } from "@xano/js-sdk";
-import { debounce, qs, qsa } from "../utils";
-
-document.addEventListener("DOMContentLoaded", async () => {
-  userFeedCode({ dataSource: "live" });
-});
-
+import { debounce, qs, qsa } from "../../utils";
 export async function userFeedCode({
   dataSource,
 }: {
   dataSource: "live" | "dev";
 }) {
+  const route = dataSource === "dev" ? "/dev" : "";
   const xano_userFeed = new XanoClient({
     apiGroupBaseUrl: "https://xhka-anc3-3fve.n7c.xano.io/api:Hv8ldLVU",
   }).setDataSource(dataSource);
@@ -420,11 +416,22 @@ export async function userFeedCode({
       companyInputs.forEach((companyInput) => {
         fakeCheckboxToggle(companyInput!);
         companyInput?.setAttribute("dev-input-type", "company_id");
-        insight.company_id &&
+        if (insight.company_id) {
           companyInput?.setAttribute(
             "dev-input-id",
             insight.company_id.toString()
           );
+        } else {
+          const inputForm = companyInput.closest("form");
+          if (inputForm) {
+            inputForm.style.display = "none";
+          }
+        }
+        // insight.company_id &&
+        //   companyInput?.setAttribute(
+        //     "dev-input-id",
+        //     insight.company_id.toString()
+        //   );
         companyInput && followFavouriteLogic(companyInput);
         companyInput &&
           setCheckboxesInitialState(
@@ -500,15 +507,16 @@ export async function userFeedCode({
       publishedDateTargetWrapper.forEach((item) =>
         item.classList[publishedDate ? "remove" : "add"]("hide")
       );
-      insightLink!.setAttribute("href", "/insight/" + insight.slug);
+      insightLink!.setAttribute("href", `${route}/insight/` + insight.slug);
       sourceTarget!.setAttribute("href", insight["source-url"]);
       sourceTargetWrapper?.classList[insight["source-url"] ? "remove" : "add"](
         "hide"
       );
-      companyLink!.setAttribute(
-        "href",
-        "/company/" + insight.company_details?.slug
-      );
+      insight.company_details?.slug &&
+        companyLink!.setAttribute(
+          "href",
+          `${route}/company/` + insight.company_details?.slug
+        );
       sourceTarget!.textContent = insight.source;
       sourceAuthorTargetWrapper.forEach((item) =>
         item.classList[insight.source_author ? "remove" : "add"]("hide")
@@ -555,10 +563,10 @@ export async function userFeedCode({
         id: Number(id),
         target: type,
       });
-      console.log("userFollowingAndFavourite-1", userFollowingAndFavourite);
+      //   console.log("userFollowingAndFavourite-1", userFollowingAndFavourite);
       await getUserFollowingAndFavourite();
       // run function to updated all-tab inputs
-      console.log("userFollowingAndFavourite-2", userFollowingAndFavourite);
+      //   console.log("userFollowingAndFavourite-2", userFollowingAndFavourite);
 
       allTabsTarget.childNodes.forEach((insight) => {
         // console.log("insights",insight)
@@ -575,11 +583,25 @@ export async function userFeedCode({
   }
 
   function formatCuratedDate(inputDate: Date) {
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
     const date = new Date(inputDate);
-    return `${date.toLocaleString("default", {
-      month: "short",
-      timeZone: "UTC",
-    })} ${date.getFullYear()}`;
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    const day = date.getDate();
+    return `${months[month]} ${day.toString().padStart(2, "0")}, ${year}`;
   }
 
   function formatPublishedDate(inputDate: Date) {
@@ -706,7 +728,7 @@ export async function userFeedCode({
             `[dev-fake-checkbox-wrapper]`
           )!.style.cursor = "pointer";
           const anchor = document.createElement("a");
-          anchor.href = `/technology/${item.slug}`;
+          anchor.href = `${route}/technology/${item.slug}`;
           anchor.textContent = tagSpan!.textContent;
           anchor.style.cursor = "pointer";
           anchor.classList.add("tag-span-name");
@@ -965,22 +987,22 @@ export async function userFeedCode({
           if (inputType === "company_id") {
             newFollowingItem
               .querySelector("[dev-target=link]")
-              ?.setAttribute("href", "/company/" + item.slug);
+              ?.setAttribute("href", `${route}/company/` + item.slug);
           }
           if (inputType === "event_id") {
             newFollowingItem
               .querySelector("[dev-target=link]")
-              ?.setAttribute("href", "/event/" + item.slug);
+              ?.setAttribute("href", `${route}/event/` + item.slug);
           }
           if (inputType === "people_id") {
             newFollowingItem
               .querySelector("[dev-target=link]")
-              ?.setAttribute("href", "/person/" + item.slug);
+              ?.setAttribute("href", `${route}/person/` + item.slug);
           }
           if (inputType === "technology_category_id") {
             newFollowingItem
               .querySelector("[dev-target=link]")
-              ?.setAttribute("href", "/technology/" + item.slug);
+              ?.setAttribute("href", `${route}/technology/` + item.slug);
           }
           newFollowingItem.querySelector("[dev-target=name]")!.textContent =
             item.name;
