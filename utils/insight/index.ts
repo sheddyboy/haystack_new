@@ -1,6 +1,6 @@
 import { XanoClient } from "@xano/js-sdk";
 import { InsightResponse, UserFollowingAndFavourite } from "../../types";
-import { debounce, qs, qsa } from "../../utils";
+import { debounce, formatCuratedDate, qs, qsa } from "../../utils";
 export async function insightPageCode({
   dataSource,
 }: {
@@ -615,14 +615,6 @@ export async function insightPageCode({
         .closest<HTMLDivElement>("[dev-fake-checkbox-wrapper]")
         ?.classList.remove("checked");
     }
-  }
-
-  function formatCuratedDate(inputDate: Date) {
-    const date = new Date(inputDate);
-    return `${date.toLocaleString("default", {
-      month: "short",
-      timeZone: "UTC",
-    })} ${date.getFullYear()}`;
   }
 
   function formatPublishedDate(inputDate: Date) {

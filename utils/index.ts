@@ -20,3 +20,25 @@ export function qsa<T extends HTMLElement = HTMLDivElement>(
 ): NodeListOf<T> {
   return document.querySelectorAll(selector) as NodeListOf<T>;
 }
+
+export function formatCuratedDate(inputDate: Date) {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const date = new Date(inputDate);
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  const day = date.getDate();
+  return `${months[month]} ${day.toString().padStart(2, "0")}, ${year}`;
+}

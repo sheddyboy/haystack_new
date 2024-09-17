@@ -6,7 +6,7 @@ import {
   SearchObject,
   UserFollowingAndFavourite,
 } from "../../types";
-import { debounce, qs, qsa } from "../../utils";
+import { debounce, formatCuratedDate, qs, qsa } from "../../utils";
 
 export async function eventPageCode({
   dataSource,
@@ -911,14 +911,6 @@ export async function eventPageCode({
         targetWrapper?.appendChild(newTag);
       }
     });
-  }
-
-  function formatCuratedDate(inputDate: Date) {
-    const date = new Date(inputDate);
-    return `${date.toLocaleString("default", {
-      month: "short",
-      timeZone: "UTC",
-    })} ${date.getFullYear()}`;
   }
 
   function formatPublishedDate(inputDate: Date) {

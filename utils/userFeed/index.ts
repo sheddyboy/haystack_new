@@ -6,7 +6,7 @@ import {
   type UserFollowingAndFavourite,
 } from "../../types/index";
 import { XanoClient } from "@xano/js-sdk";
-import { debounce, qs, qsa } from "../../utils";
+import { debounce, formatCuratedDate, qs, qsa } from "../../utils";
 export async function userFeedCode({
   dataSource,
 }: {
@@ -580,28 +580,6 @@ export async function userFeedCode({
       console.error(`followFavouriteLogic${endPoint}_error`, error);
       return null;
     }
-  }
-
-  function formatCuratedDate(inputDate: Date) {
-    const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-    const date = new Date(inputDate);
-    const month = date.getMonth();
-    const year = date.getFullYear();
-    const day = date.getDate();
-    return `${months[month]} ${day.toString().padStart(2, "0")}, ${year}`;
   }
 
   function formatPublishedDate(inputDate: Date) {
